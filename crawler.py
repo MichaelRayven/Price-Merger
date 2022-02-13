@@ -51,10 +51,10 @@ class Crawler():
 
     def __next_page(self):
         print("[INFO] Getting next page...", end=" ")
-        button_element = self._driver.find_element(
+        button_element = self._driver.find_elements(
             By.CSS_SELECTOR, ".ib.select+a")
-        if button_element is not None:
-            button_element.click()
+        if len(button_element) > 0:
+            button_element[0].click()
             print("Success!")
             return True
         else:
