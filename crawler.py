@@ -38,7 +38,7 @@ class Crawler():
             
             link_elements = self._driver.find_elements(By.CSS_SELECTOR, ".model-short-title.no-u")
             if len(link_elements) == 0: break
-        print("[INFO] Collected URLs!")
+        print("[INFO] URLs collected!")
 
     def __init_driver(self):
         driver = webdriver.Chrome()
