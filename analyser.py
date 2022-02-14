@@ -19,7 +19,7 @@ class DataAnalyser:
         for week in range(0,53):
             occurances = overall_occurances = sum = 0
             for data in self._data_list:
-                if data[0].get(week) is not None:
+                if data[0][week] is not None:
                     overall_occurances += data[1][week]
                     sum += data[0][week]
                     occurances += 1
