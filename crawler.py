@@ -12,7 +12,7 @@ class Crawler():
         self._query = urllib.parse.quote_plus(re.sub(" ", "+", query))
         self._data = []
 
-    def list_urls(self, count: int):
+    def get_urls_list(self, count: int):
         if len(self._data) >= count: self._data[0:count]
         
         self._driver = self.__init_driver()

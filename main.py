@@ -1,4 +1,5 @@
-import json
+import asyncio
+from jsonfile import load_json, save_json
 import os
 from dotenv import load_dotenv
 from analyser import DataAnalyser
@@ -19,27 +20,19 @@ def main():
     data_threshold = os.environ["DATA_THRESHOLD"]
 
     if url_list_path != "":
-        url_list = []
-        try:
-            with open(os.path.abspath(url_list_path), "r") as file:
-                data = json.loads(file.read())
-                if isinstance(data, list):
-                    url_list = data
-                else:
-                    raise Exception("[Error] Insuffisient data type")
-        except Exception as err:
-            print(err)
-            return
-        
+        print("[INFO] Loading URLs from list")
+        url_list = load_json(url_list_path)
         parser = Parser(url_list)
     else:
         print("[INFO] Creating Crawler")
         crawler = Crawler(search_query)
-        parser = Parser(crawler.list_urls(int(url_quantity)))
+        url_list = crawler.get_urls_list(int(url_quantity))
+        parser = Parser(url_list)
+        
     
     data_list = parser.parse_data()
-
     print("[INFO] Analysing the data")
+
     analyser = DataAnalyser(data_list, data_preference, int(data_threshold))
     data = analyser.pack_data()
     

@@ -10,9 +10,10 @@ import aiohttp
 class Parser:
     def __init__(self, url_list: list) -> None:
         self._urls = url_list
-        print(f"[INFO] Parsing {len(url_list)} URLs")
+        print(f"[INFO] Recieved {len(url_list)} URLs")
 
     def parse_data(self) -> list:
+        print("[INFO] Fetching URLs")
         loop = asyncio.get_event_loop()
         responses = loop.run_until_complete(self.get_documents(self._urls, loop))
         loop.run_until_complete(asyncio.sleep(10))
@@ -41,13 +42,19 @@ class Parser:
         return (True, data)
 
     async def get_documents(self, urls, loop):
-        async with aiohttp.ClientSession(loop=loop) as session: 
+        connector = aiohttp.TCPConnector(limit=15)
+        async with aiohttp.ClientSession(loop=loop, connector=connector) as session: 
             responses = await asyncio.gather(*[self.fetch(url, session) for url in urls], return_exceptions=True)
             return responses
 
     async def fetch(self, url, session: aiohttp.ClientSession):
-        delay = round(random.random() + 0.5, 2)
-        print(f"[INFO] Fetching {url} with delay: {delay}")
-        await asyncio.sleep(delay)
+        # delay = round((random.random() + 0.05) * 3, 2)
+        # print(f"[INFO] Fetching {url} with a delay of: {delay}s...")
+        # await asyncio.sleep(delay)
         async with session.get(url, ssl=ssl.SSLContext()) as response:
-            return await response.text()
+            if response.status == 200:
+                print(f"[INFO] Fetched: {url}, success" + '\033[92m')
+                return await response.text()
+            else:
+                print(f"[INFO] Fetched: {url}, failed" + '\033[91m')
+            
