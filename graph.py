@@ -3,67 +3,77 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mpl_dates
 from scipy.interpolate import pchip
 import numpy as np
-import calendar
+import mplcursors
 
 
 class GraphBuilder():
-    def __init__(self, graph_data) -> None:
-        self._data = self.__prepare_graph_data(graph_data)
-        self.__configure_graph()
+    def __init__(self, graph_data, barchart_data) -> None:
+        self._graph_data = graph_data
+        self._barchart_data = barchart_data
+        self.__configure_graphs()
         self.__display_graph()
 
-    def __prepare_graph_data(self, graph_data):
-        graph_data["unixtime"] = list(map(lambda date: calendar.timegm(date.timetuple()), graph_data["dates"]))
-        return graph_data
+    def __calculate_unix(self, dates):
+        return list(map(lambda date:  date.timestamp(), dates))
 
-    def __configure_graph(self):
-        plt.style.use('dark_background')
+    def __month_barchart(self, ax, fig, y):
+        x = range(12)
+        bar = ax.bar(x, y, label="Monthly average")
 
-        plt.title("Price / Average Price Percentage")
-        plt.ylabel("Price Percent")
-        plt.xlabel("Month, Day")
+        ax.set_xticks(x)
+        ax.set_xticklabels(['Jan', 'Feb', 'Mar', 'Apr', 'May',
+                           'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
 
+        cursor = mplcursors.cursor(bar, hover=True)
+
+        @cursor.connect("add")
+        def on_add(sel):
+            sel.annotation.arrow_patch.set(
+                arrowstyle="simple", fc="white", alpha=.5)
+            sel.annotation.get_bbox_patch().set(fc="gray", alpha=0.6)
+            sel.annotation.set(text=y[sel.index])
+
+    def __week_plot(self, ax, fig, x, y):
+        unixtimes = self.__calculate_unix(x)
         smooth_dates = np.linspace(
-            self._data["unixtime"][0], self._data["unixtime"][-1], len(self._data["unixtime"]) * 20)
-        smooth_prices = np.round(pchip(
-            self._data["unixtime"], self._data["prices"])(smooth_dates), 2)
-        smooth_dates = list(map(lambda unixtime: datetime.utcfromtimestamp(round(unixtime, 2)), smooth_dates))
+            unixtimes[0], unixtimes[-1], len(unixtimes) * 20)
+        smooth_prices = pchip(unixtimes, y)(smooth_dates)
+        smooth_dates = list(
+            map(lambda unix: datetime.utcfromtimestamp(round(unix, 2)), smooth_dates))
 
-        plt.plot_date(self._data["dates"], self._data["prices"], color="#fcba03", linestyle="solid", linewidth=3, label='Raw data')
-        self._line, = plt.plot_date(smooth_dates, smooth_prices, fmt="", linewidth=1, color="#c934eb", linestyle="solid", label='Interpolated data')
+        ax.plot_date(x, y, color="#fcba03", linestyle="solid",
+                     linewidth=3, label='Raw data')
+        line, = ax.plot_date(smooth_dates, smooth_prices, marker="", linewidth=1,
+                             color="#c934eb", linestyle="solid", label='Interpolated data')
 
-        plt.gcf().autofmt_xdate()
-        self._annot = plt.gca().annotate("", xy=(0, 0), xytext=(-20, 20), textcoords="offset points",
-                                        bbox=dict(boxstyle="round", fc="w"),
-                                        arrowprops=dict(arrowstyle="->"))
+        cursor = mplcursors.cursor(line, hover=True)
 
-        plt.gcf().canvas.mpl_connect("motion_notify_event", self.__hover)
-        plt.tight_layout()
-        
+        @cursor.connect("add")
+        def on_add(sel):
+            sel.annotation.arrow_patch.set(
+                arrowstyle="simple", fc="white", alpha=.5)
+            sel.annotation.get_bbox_patch().set(fc="gray", alpha=0.6)
+            sel.annotation.set(text=f"{round(sel.target[1], 2)}%")
+
         date_format = mpl_dates.DateFormatter('%b, %d')
-        plt.gca().xaxis.set_major_formatter(date_format)
+        ax.xaxis.set_major_formatter(date_format)
 
-        plt.legend()
+    def __configure_graphs(self):
+        plt.style.use('dark_background')
+        # plt.style.use('seaborn')
+        fig, ax = plt.subplots(nrows=2)
 
-    def __update_annot(self, ind):
-        x, y = self._line.get_data()
-        self._annot.xy = (x[ind["ind"][0]], y[ind["ind"][0]])
-        text = f"{self._annot.xy[1]}%"
-        self._annot.set_text(text)
-        self._annot.get_bbox_patch().set_alpha(0.6)
+        self.__week_plot(ax[1], fig, self._graph_data["weeks"],
+                         self._graph_data["prices"])
+        self.__month_barchart(ax[0], fig, self._barchart_data["prices"])
 
-    def __hover(self, event):
-        vis = self._annot.get_visible()
-        if event.inaxes == plt.gca():
-            cont, ind = self._line.contains(event)
-            if cont:
-                self.__update_annot(ind)
-                self._annot.set_visible(True)
-                plt.gcf().canvas.draw_idle()
-            else:
-                if vis:
-                    self._annot.set_visible(False)
-                    plt.gcf().canvas.draw_idle()
+        fig.suptitle("Price / Average Price Percentage")
+
+        fig.supxlabel('Month and Day')
+        fig.supylabel('Price Percentage')
+
+        # fig.tight_layout()
+        fig.legend()
 
     def __display_graph(self):
         plt.show()
