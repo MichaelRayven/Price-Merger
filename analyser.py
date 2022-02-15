@@ -1,69 +1,105 @@
-import asyncio
 from datetime import datetime, timedelta
-from isoweek import Week
+from math import floor
 
 
 class DataAnalyser:
     def __init__(self, data_list, data_preference: str, data_threshold: int):
-        self._data_list = data_list
         self._dtype = data_preference
         self._thold = data_threshold
+        self._data_list = self.sort_data(data_list)
         
-    def pack_data(self):
+    def pack_into_weeks(self):
         print("[INFO] Formatting the data...", end=" ")
-        loop = asyncio.get_event_loop()
-        self._data_list = list(map(lambda data: self.format_data(data), self._data_list))
-        loop.close()
+        data_list = list(map(lambda data: self.format_data_weeks(data), self._data_list))
         print("Done!")
         
-        packed_data = {"dates": [], "prices": []}
+        packed_data = {"weeks": [], "prices": []}
         print("[INFO] Packing the data...", end=" ")
-        for week in range(0,53):
+        for week in range(52):
             occurances = sum = 0
-            for data in self._data_list:
-                if data[0][week] is not None:
-                    sum += data[0][week]
-                    occurances += data[1][week]
+            for data in data_list:
+                if data[week] is not None:
+                    sum += data[week]
+                    occurances += 1
             if occurances >= self._thold:
-                date = Week(2018, week + 1).monday()
-                packed_data["dates"].append(date)
+                dtm = datetime.fromisocalendar(1970, week + 2, 1)
+                packed_data["weeks"].append(dtm)
                 packed_data["prices"].append(round(sum/occurances, 2))
-        print(f"Packing {len(self._data_list)} entries complete!")
+        print(f"Packing {len(data_list)} entries complete!")
         return packed_data
 
-    def format_data(self, data):
-        prices = [None] * 53
-        occurances = [None] * 53
+    def pack_into_months(self):
+        print("[INFO] Formatting the data...", end=" ")
+        data_list = list(map(lambda data: self.format_data_months(data), self._data_list))
+        print("Done!")
+        
+        packed_data = {"months": [], "prices": []}
+        print("[INFO] Packing the data...", end=" ")
+        for month in range(12):
+            occurances = overall_occurances = sum = 0
+            for data in data_list:
+                if data[0][month] is not None:
+                    sum += data[0][month]
+                    overall_occurances += data[1][month]
+                    occurances += 1
+            if occurances >= self._thold:
+                dtm = datetime(1970, month + 1, 1)
+                packed_data["months"].append(dtm)
+                packed_data["prices"].append(round(sum/overall_occurances, 2))
+        print(f"Packing {len(data_list)} entries complete!")
+        return packed_data
+        
+    def format_data_weeks(self, data):
+        prices = [None] * 52
+        average = self.calculate_average(data)
+        week_number = (datetime.utcfromtimestamp(float(data[0]["date"]) / 1000) + timedelta(hours=3)).isocalendar()[1] - 1
+        if week_number == 52: week_number = 0
+        for point in data:
+            relative_price = self.to_relative_price(point, average)
+            prices[week_number] = relative_price
+            week_number = (week_number + 1) % 52
+        return prices
+    
+    def format_data_months(self, data):
+        prices = [None] * 12
+        occurances = [None] * 12
         average = self.calculate_average(data)
         for point in data:
-            point_datetime = (datetime.utcfromtimestamp(float(point["date"]) / 1000) + timedelta(hours=3))
-            week_number = Week.withdate(point_datetime).year_week()[1] - 1
+            month = (datetime.utcfromtimestamp(float(point["date"]) / 1000) + timedelta(hours=3)).month - 1
             relative_price = self.to_relative_price(point, average)
-            if prices[week_number] is None:
-                prices[week_number] = relative_price
-                occurances[week_number] = 1
+            if prices[month] is None:
+                prices[month] = relative_price
+                occurances[month] = 1
             else:
-                prices[week_number] += relative_price
-                occurances[week_number] += 1
+                prices[month] += relative_price
+                occurances[month] += 1
         return (prices, occurances)
     
+    def sort_data(self, data_list):
+        new_data_list = []
+        for data in data_list:
+            key = self._dtype.lower()
+            for i in range(floor(len(data)/52)):
+                if data[0].get("value") is not None and key == "avg" or data[0].get(key) is not None:
+                    new_data_list.append(data[i*52:(i+1)*52])
+                
+        return new_data_list
+    
     def to_relative_price(self, point, average):
-        key = self._dtype
-        if point.get("value") is not None and key.lower() == "avg":
+        key = self._dtype.lower()
+        if point.get("value") is not None and key == "avg":
             key = "value"
-        if point.get(key.lower()) is not None:
-            relative_pricing = (int(point[key.lower()]) / average) * 100
-            return round(relative_pricing, 2)
+
+        relative_pricing = (int(point[key]) / average) * 100
+        return round(relative_pricing, 2)
 
     def calculate_average(self, data):
-        key = self._dtype
+        key = self._dtype.lower()
         sum = count = 0
-        if data[0].get("value") is not None and key.lower() == "avg": 
+        if data[0].get("value") is not None and key == "avg": 
             key = "value"
-        if data[0].get(key.lower()) is not None:
-            for point in data:
-                sum += int(point[key.lower()])
-                count += 1
-        else:
-            return None
+        
+        for point in data:
+            sum += int(point[key])
+            count += 1
         return round(sum/count, 2)
