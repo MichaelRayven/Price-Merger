@@ -5,6 +5,7 @@ import asyncio
 import ssl
 from bs4 import BeautifulSoup
 import aiohttp
+from async_retrying import retry
 
 
 class Parser:
@@ -15,8 +16,9 @@ class Parser:
     def parse_data(self) -> list:
         print("[INFO] Fetching URLs")
         loop = asyncio.get_event_loop()
-        responses = loop.run_until_complete(self.get_documents(self._urls, loop))
         loop.run_until_complete(asyncio.sleep(10))
+        responses = loop.run_until_complete(self.get_documents(self._urls, loop))
+        loop.run_until_complete(asyncio.sleep(1))
         loop.close()
         
         data_list = []
@@ -42,19 +44,19 @@ class Parser:
         return (True, data)
 
     async def get_documents(self, urls, loop):
-        connector = aiohttp.TCPConnector(limit=15)
-        async with aiohttp.ClientSession(loop=loop, connector=connector) as session: 
-            responses = await asyncio.gather(*[self.fetch(url, session) for url in urls], return_exceptions=True)
+        connector = aiohttp.TCPConnector(limit=10)
+        async with aiohttp.ClientSession(loop=loop, connector=connector, raise_for_status=True) as session: 
+            responses = await asyncio.gather(*[self.fetch(url, session) for url in urls], return_exceptions=False)
             return responses
 
+    @retry(attempts=3)
     async def fetch(self, url, session: aiohttp.ClientSession):
-        # delay = round((random.random() + 0.05) * 3, 2)
-        # print(f"[INFO] Fetching {url} with a delay of: {delay}s...")
+        # delay = round(random.random(), 2) * 2
         # await asyncio.sleep(delay)
         async with session.get(url, ssl=ssl.SSLContext()) as response:
-            if response.status == 200:
-                print(f"[INFO] Fetched: {url}, success" + '\033[92m')
-                return await response.text()
-            else:
-                print(f"[INFO] Fetched: {url}, failed" + '\033[91m')
+            if response.status not in (200, 429):
+                print(f"[INFO] Fetched: {url}, failed: {response.status}")
+                raise aiohttp.ClientResponseError()
+            print(f"[INFO] Fetched: {url}, success")
+            return await response.text()
             
