@@ -1,4 +1,3 @@
-import asyncio
 from jsonfile import load_json, save_json
 import os
 from dotenv import load_dotenv
@@ -32,11 +31,12 @@ def main():
     
     data_list = parser.parse_data()
     print("[INFO] Analysing the data")
-
-    analyser = DataAnalyser(data_list, data_preference, int(data_threshold))
-    data = analyser.pack_data()
     
-    GraphBuilder(data)
+    analyser = DataAnalyser(data_list, data_preference, int(data_threshold))
+    week_data = analyser.pack_into_weeks()
+    month_data = analyser.pack_into_months()
+    
+    GraphBuilder(week_data, month_data)
 
 
 if __name__ == "__main__":
