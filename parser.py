@@ -16,47 +16,48 @@ class Parser:
     def parse_data(self) -> list:
         print("[INFO] Fetching URLs")
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(asyncio.sleep(10))
-        responses = loop.run_until_complete(self.get_documents(self._urls, loop))
+        responses = loop.run_until_complete(
+            self.get_documents(self._urls, loop))
         loop.run_until_complete(asyncio.sleep(1))
         loop.close()
-        
+
         data_list = []
         print("[INFO] Done fetching, now parsing")
         for document in responses:
             if isinstance(document, str):
                 (status, result) = self.parse_page(document)
-                if status: data_list.append(result)
-        
+                if status:
+                    data_list.append(result)
+
         print(f"[INFO] Succssfully parsed {len(data_list)} URLs")
         return data_list
 
     def parse_page(self, document):
         soup = BeautifulSoup(document, "html.parser")
         script_tags = soup.select(".tabs-content>div script")
-        if script_tags is None or len(script_tags) < 2: return (False, None)
-        
+        if script_tags is None or len(script_tags) < 2:
+            return (False, None)
+
         script_text = script_tags[1].getText()
-        match = re.search(r"\"data\":(\[.*\])", script_text, flags=re.MULTILINE|re.DOTALL)
-        if match is None: return (False, None)
-        
+        match = re.search(
+            r"\"data\":(\[.*\])", script_text, flags=re.MULTILINE | re.DOTALL)
+        if match is None:
+            return (False, None)
+
         data = json.loads(match.group(1))
         return (True, data)
 
     async def get_documents(self, urls, loop):
         connector = aiohttp.TCPConnector(limit=10)
-        async with aiohttp.ClientSession(loop=loop, connector=connector, raise_for_status=True) as session: 
+        async with aiohttp.ClientSession(loop=loop, connector=connector, raise_for_status=True) as session:
             responses = await asyncio.gather(*[self.fetch(url, session) for url in urls], return_exceptions=False)
             return responses
 
     @retry(attempts=3)
     async def fetch(self, url, session: aiohttp.ClientSession):
-        # delay = round(random.random(), 2) * 2
-        # await asyncio.sleep(delay)
         async with session.get(url, ssl=ssl.SSLContext()) as response:
             if response.status not in (200, 429):
                 print(f"[INFO] Fetched: {url}, failed: {response.status}")
                 raise aiohttp.ClientResponseError()
             print(f"[INFO] Fetched: {url}, success")
             return await response.text()
-            
