@@ -8,8 +8,9 @@ import urllib.parse
 
 
 class Crawler():
-    def __init__(self, query: str) -> None:
-        self._query = urllib.parse.quote_plus(re.sub(" ", "+", query))
+    def __init__(self, query: str, target_url: str) -> None:
+        self._query = query
+        self._target = target_url
         self._data = []
 
     def get_urls_list(self, count: int):
@@ -36,16 +37,19 @@ class Crawler():
             next = self.__next_page()
             if not next: break
             
-            link_elements = self._driver.find_elements(By.CSS_SELECTOR, ".model-short-title.no-u")
+            link_elements = self._driver.find_elements(By.XPATH, "//div[contains(@class, 'list-item--goods')]//a[@data-url]")
             if len(link_elements) == 0: break
         print("[INFO] URLs collected!")
 
     def __init_driver(self):
         driver = webdriver.Chrome()
         driver.implicitly_wait(5)
-        driver.get(f"https://www.e-katalog.ru/ek-list.php?search_={self._query}")
-        WebDriverWait(driver, 10).until_not(
-            EC.url_to_be(f"https://www.e-katalog.ru/ek-list.php?search_={self._query}"))
+        if self._target:
+            driver.get(self._target)
+        else:
+            driver.get(f"https://www.e-katalog.ru/ek-list.php?search_={self._query}")
+            WebDriverWait(driver, 10).until_not(
+                EC.url_to_be(f"https://www.e-katalog.ru/ek-list.php?search_={self._query}"))
         print("[INFO] Driver initialized!")
         return driver
 
@@ -63,8 +67,7 @@ class Crawler():
 
     def __recover_progress(self):
         if len(self._data) > 0:
-            links_on_page = self._driver.find_elements(
-                By.CSS_SELECTOR, ".model-short-title.no-u")
+            links_on_page = self._driver.find_elements(By.XPATH, "//div[contains(@class, 'list-item--goods')]//a[@data-url]")
             page = floor(self._data / len(links_on_page))
 
             if page == 0: return links_on_page[len(self._data):]
@@ -76,11 +79,10 @@ class Crawler():
                 return []
 
             self._driver.get(self._driver.current_url + f"&page_={page}")
-            links_on_current_page = self._driver.find_elements(
-                By.CSS_SELECTOR, ".model-short-title.no-u")
+            links_on_current_page = self._driver.find_elements(By.XPATH, "//div[contains(@class, 'list-item--goods')]//a[@data-url]")
 
             if len(links_on_current_page) == 0:
                 return []
             else:
                 return links_on_current_page[len(self._data) % len(links_on_page):]
-        return self._driver.find_elements(By.CSS_SELECTOR, ".model-short-title.no-u")
+        return self._driver.find_elements(By.XPATH, "//div[contains(@class, 'list-item--goods')]//a[@data-url]")
