@@ -10,15 +10,15 @@ class DataAnalyser:
             self._use_median = False
         else:
             self._use_median = True
-        self._data_list = self.sort_data(data_list)
+        self._data_list = self.__sort_data(data_list)
         
     def pack_into_weeks(self):
-        print("[INFO] Formatting the data...", end=" ")
-        data_list = list(map(lambda data: self.separate_by_week(data), self._data_list))
+        print("[INFO] Sorting the data by week...", end=" ")
+        data_list = list(map(lambda data: self.__separate_by_week(data), self._data_list))
         print("Done!")
         
         packed_data = {"weeks": [], "prices": []}
-        print("[INFO] Packing the data...", end=" ")
+        print(f"[INFO] Packing week data...", end=" ")
         
         for week in range(52):
             dtm = datetime.fromisocalendar(1970, week + 2, 1)
@@ -50,24 +50,24 @@ class DataAnalyser:
         print(f"Packing {len(data_list)} entries complete!")
         return packed_data
         
-    def separate_by_week(self, data):
+    def __separate_by_week(self, data):
         prices = [None] * 52
-        average = self.calculate_mean(data)
+        average = self.__calculate_mean(data)
         week_number = (datetime.utcfromtimestamp(float(data[0]["date"]) / 1000) + timedelta(hours=3)).isocalendar()[1] - 1
         if week_number == 52: week_number = 0
         for point in data:
-            relative_price = self.to_relative_price(point, average)
+            relative_price = self.__to_relative_price(point, average)
             prices[week_number] = relative_price
             week_number = (week_number + 1) % 52
         return prices
     
     def pack_into_months(self):
-        print("[INFO] Formatting the data...", end=" ")
-        data_list = list(map(lambda data: self.separate_by_month(data), self._data_list))
+        print("[INFO] Sorting the data by month...", end=" ")
+        data_list = list(map(lambda data: self.__separate_by_month(data), self._data_list))
         print("Done!")
         
         packed_data = {"months": [], "prices": []}
-        print("[INFO] Packing the data...", end=" ")
+        print("[INFO] Packing month data...", end=" ")
         
         for month in range(12):
             dtm = datetime(1970, month + 1, 1)
@@ -100,18 +100,18 @@ class DataAnalyser:
         print(f"Packing {len(data_list)} entries complete!")
         return packed_data
     
-    def separate_by_month(self, data):
+    def __separate_by_month(self, data):
         prices = []
         for i in range(12):
             prices.append([])
-        average = self.calculate_mean(data)
+        average = self.__calculate_mean(data)
         for point in data:
             month = (datetime.utcfromtimestamp(float(point["date"]) / 1000) + timedelta(hours=3)).month - 1
-            relative_price = self.to_relative_price(point, average)
+            relative_price = self.__to_relative_price(point, average)
             prices[month].append(relative_price)
         return prices
     
-    def sort_data(self, data_list):
+    def __sort_data(self, data_list):
         new_data_list = []
         for data in data_list:
             key = self._dtype.lower()
@@ -121,7 +121,7 @@ class DataAnalyser:
                 
         return new_data_list
     
-    def to_relative_price(self, point, average):
+    def __to_relative_price(self, point, average):
         key = self._dtype.lower()
         if point.get("value") is not None and key == "avg":
             key = "value"
@@ -129,7 +129,7 @@ class DataAnalyser:
         relative_pricing = (int(point[key]) / average) * 100
         return round(relative_pricing, 2)
 
-    def calculate_median(self, data):
+    def __calculate_median(self, data):
         key = self._dtype.lower()
         price_list = []
         if data[0].get("value") is not None and key == "avg": 
@@ -139,7 +139,7 @@ class DataAnalyser:
         price_list = sorted(price_list)
         return round(price_list[floor(len(price_list)/2)], 2)
 
-    def calculate_mean(self, data):
+    def __calculate_mean(self, data):
         key = self._dtype.lower()
         sum = count = 0
         if data[0].get("value") is not None and key == "avg": 
